@@ -2,9 +2,11 @@
   "name": "projectv",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "esbuild src/index.js --bundle --outfile=dist/index.js --watch",
+    "build": "esbuild src/index.js --bundle --minify --outfile=dist/index.js"
   },
   "repository": {
     "type": "git",
@@ -13,9 +15,11 @@
   "keywords": [],
   "author": "Maksym Chechel",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/MaxChechel/ProjectV/issues"
   },
-  "homepage": "https://github.com/MaxChechel/ProjectV#readme"
+  "homepage": "https://github.com/MaxChechel/ProjectV#readme",
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  }
 }
