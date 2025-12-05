@@ -8,8 +8,36 @@ import { initForm } from "./form.js";
 window.scrollImagesAnimation = null;
 window.scrollImagesInfiniteAnimation = null;
 
+// Wait for required dependencies to load
+const waitForDependencies = () => {
+  return new Promise((resolve) => {
+    const checkDependencies = () => {
+      const hasGsap = typeof gsap !== "undefined";
+      const hasObserver = typeof Observer !== "undefined";
+      const hasGrained = typeof grained !== "undefined";
+
+      console.log("Checking dependencies:", {
+        gsap: hasGsap,
+        Observer: hasObserver,
+        grained: hasGrained,
+      });
+
+      if (hasGsap && hasObserver && hasGrained) {
+        console.log("✓ All dependencies loaded!");
+        resolve();
+      } else {
+        console.log("⏳ Waiting for dependencies...");
+        setTimeout(checkDependencies, 100);
+      }
+    };
+    checkDependencies();
+  });
+};
+
 // Sequence: Loader first, then ScrollImages
 window.addEventListener("DOMContentLoaded", async () => {
+  // Wait for GSAP, Observer, and Grained to be available
+  await waitForDependencies();
   grainBg();
 
   // 1. Initialize scroll images component (returns API with preload methods)
