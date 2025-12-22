@@ -7,7 +7,9 @@ export const initFormTypeSize = () => {
   if (!formInputs.length) return;
 
   formInputs.forEach((input) => {
-    const baseFontSize = 17.5; // placeholder size
+    // Set base font size based on screen width
+    const isMobile = window.innerWidth < 991;
+    const baseFontSize = isMobile ? 16 : 17.5; // 16vw on mobile, 17.5vw on desktop
 
     // Create hidden span for measuring text width
     const measureSpan = document.createElement("span");

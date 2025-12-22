@@ -1,4 +1,4 @@
-export const initLoader = () => {
+export const initLoader = (assetsReadyPromise) => {
   const loaderWrapper = document.querySelector(".loader_wrapper");
   const numsWrapper = document.querySelector(".loader_nums_wrap");
   const numsTrack1 = document.querySelector(".loader_num_track.is-1");
@@ -12,16 +12,11 @@ export const initLoader = () => {
     ".loader_num:not(:first-child)"
   );
 
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const loaderTl = gsap.timeline({
       delay: 0.5,
-      onComplete: () => {
-        console.log("✅ Loader complete!");
-        resolve();
-      },
     });
 
-    //Step 1
     const loaderStep1 = gsap.timeline();
 
     loaderStep1
@@ -61,7 +56,6 @@ export const initLoader = () => {
         "<0%"
       );
 
-    //Step 2
     const loaderStep2 = gsap.timeline();
 
     loaderStep2
@@ -94,8 +88,6 @@ export const initLoader = () => {
         },
         "<0%"
       );
-
-    //Step 3
 
     const loaderStep3 = gsap.timeline();
 
@@ -130,13 +122,22 @@ export const initLoader = () => {
         "<25%"
       );
 
-    loaderTl
-      .add(loaderStep1)
-      .add(loaderStep2, ">.5")
-      .add(loaderStep3, ">.5")
-      .to(loaderWrapper, {
-        opacity: 0,
-        duration: 0.6,
-      });
+    loaderTl.add(loaderStep1).add(loaderStep2, ">.5").add(loaderStep3, ">.5");
+
+    // Wait for loader animation to reach 99%, then wait for assets
+    await loaderTl.then();
+
+    // Now wait for assets to be ready before fading out
+    if (assetsReadyPromise) {
+      await assetsReadyPromise;
+    }
+
+    // Finally fade out the loader
+    await gsap.to(loaderWrapper, {
+      opacity: 0,
+      duration: 0.6,
+    });
+
+    resolve();
   });
 };

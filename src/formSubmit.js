@@ -41,7 +41,6 @@ export const initFormSubmit = () => {
     if (window.scrollImagesAnimation) {
       window.scrollImagesAnimation.destroy();
       window.scrollImagesAnimation = null;
-      console.log("✅ Initial scroll animation destroyed");
     }
 
     // Remove initial scroll component from DOM
@@ -81,7 +80,7 @@ export const initFormSubmit = () => {
 
         // Auto-play intro animation - animate from 0 to 7
         const introAnimation = finalScrollAnimation.animateToTime(
-          6, // Target time
+          3, // Target time
           2 // Duration: 2 seconds for smooth intro
         );
 

@@ -1,34 +1,25 @@
-// Infinite Scroll Images Animation Component
-// Based on scrollImages.js but with infinite looping via repeat: -1
-
-// Utility method
 const mod = (n, m) => ((n % m) + m) % m;
 
 export const initScrollImagesInfinite = (config = {}) => {
-  // Default configuration
   const defaultConfig = {
     componentSelector: ".scroll_images_final",
     scrollSensitivity: {
       wheel: 1000,
-      touch: 500,
+      touch: 200,
     },
   };
 
-  // Merge config with defaults
   const cfg = { ...defaultConfig, ...config };
 
-  // Animation state - exactly like in the example
-  let incr = 0; // Start from 0, will animate to reveal
+  let incr = 0;
   let zIndex = 0;
   let newIndex = 0;
   const settings = { delta: 0 };
-  let isScrollEnabled = false; // Control scroll availability
+  let isScrollEnabled = false;
 
-  // Get DOM elements
   const scrollImagesComponent = document.querySelector(cfg.componentSelector);
 
   if (!scrollImagesComponent) {
-    console.warn("Scroll images component not found");
     return;
   }
 
@@ -37,11 +28,9 @@ export const initScrollImagesInfinite = (config = {}) => {
   );
 
   if (!realImages.length) {
-    console.warn("No scroll images found in component");
     return;
   }
 
-  // Collect media sources
   const medias = [];
   scrollImagesComponent
     .querySelectorAll(".scroll_images_media img")
@@ -50,11 +39,9 @@ export const initScrollImagesInfinite = (config = {}) => {
     });
 
   if (!medias.length) {
-    console.warn("No media sources found");
     return;
   }
 
-  // Initialize images - set data-index and src
   realImages.forEach((image) => {
     image.setAttribute("data-index", zIndex);
     image.setAttribute("src", medias[zIndex % medias.length]);
@@ -65,79 +52,66 @@ export const initScrollImagesInfinite = (config = {}) => {
     duration: 2,
     ease: "power1",
     onUpdate: () => {
-      incr += settings.delta; // Add the current delta value
-      tl.time(incr); // Update the progression of the timeline
+      incr += settings.delta;
+      tl.time(incr);
     },
   });
 
-  // Create timeline
   const tl = gsap.timeline({
     paused: true,
   });
 
-  // Animate images
   tl.to(realImages, {
-    scale: 1.005,
+    scale: 2.005,
     ease: "expo.inOut",
-    duration: 20, // Fixed duration like in example
+    duration: 8,
     stagger: {
-      each: 2, // 1 * 8 images = 8 = duration
-      repeat: -1, // Infinite repetition
+      each: 1,
+      repeat: -1,
       onRepeat() {
         const el = this.targets()[0];
-        const movingForward = settings.delta >= 0; // Direction detection
+        const movingForward = settings.delta >= 0;
 
-        // Update the global zIndex
         zIndex += movingForward ? 1 : -1;
 
-        // If moving forward: use the zIndex directly
-        // If moving backward: decrease its z-index by 8 to send it to the back
         el.style.zIndex = movingForward
           ? zIndex
           : zIndex - (realImages.length - 1);
 
-        // Select the reference element and calculate the new index
-        // If moving forward: take the previous element (or last one if at the beginning)
-        // If moving backward: take the next element (or first one if at the end)
         const referenceEl = movingForward
           ? el.previousElementSibling || realImages[realImages.length - 1]
           : el.nextElementSibling || realImages[0];
 
-        // Use the mod function to ensure the index stays within the image array limits
         newIndex = mod(
           parseInt(referenceEl.getAttribute("data-index")) +
             (movingForward ? 1 : -1),
           medias.length
         );
 
-        // Update attributes
-        // Store the index for future calculations
         el.setAttribute("data-index", newIndex);
         el.setAttribute("src", medias[newIndex]);
       },
     },
-  }).time(incr); // Set the progress to the value of "incr"
+  }).time(incr);
 
-  // Create scroll observer - exactly like in the example
   Observer.create({
-    target: window, // The element on which we listen for events (here, the window)
-    type: "wheel,touch", // Listens for both scroll (wheel) and touch (swipe) events
+    target: window,
+    type: "wheel,touch",
     onChange: (e) => {
-      // Ignore scroll events if scroll is disabled
       if (!isScrollEnabled) return;
 
-      // If it's a touch movement ("touchmove"), the divider is smaller to adjust sensitivity
-      const divider = e.event.type === "touchmove" ? 500 : 1000;
-      deltaTo(e.deltaY / divider);
+      const isTouchEvent = e.event.type === "touchmove";
+      const divider = isTouchEvent ? 300 : 1000;
+
+      const delta = isTouchEvent ? -e.deltaY : e.deltaY;
+      deltaTo(delta / divider);
     },
     onStop: () => {
       if (!isScrollEnabled) return;
-      // When the user stops scrolling, reset deltaTo to 0
       deltaTo(0);
     },
   });
 
-  // Return API for external control if needed
   return {
     getProgress: () => incr,
     getCurrentTime: () => incr,
@@ -147,7 +121,6 @@ export const initScrollImagesInfinite = (config = {}) => {
     disableScroll: () => {
       isScrollEnabled = false;
     },
-    // Animate to specific time value
     animateToTime: (targetTime, duration = 2) => {
       return gsap.to(
         { value: incr },

@@ -15,7 +15,7 @@ export const initFormCursor = () => {
   const cursorDiv = document.createElement("div");
   cursorDiv.className = "form_cursor";
   cursorDiv.innerHTML = `
-    <svg width="100%" height="100%" viewBox="0 0 44 272" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="auto" height="100%" display="block" viewBox="0 0 44 272" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M21.6074 8.48883V263.489" stroke="currentColor"/>
       <path d="M0.107422 0.488831C0.507422 0.574762 14.6074 5.85797 21.6074 8.48883L43.1074 0.488831" stroke="currentColor"/>
       <path d="M0.107422 271.489C0.507422 271.403 14.6074 266.12 21.6074 263.489L43.1074 271.489" stroke="currentColor"/>
@@ -25,9 +25,9 @@ export const initFormCursor = () => {
   // Style the cursor
   cursorDiv.style.position = "absolute";
   cursorDiv.style.pointerEvents = "none";
-  cursorDiv.style.top = "50%";
-  cursorDiv.style.transform = "translate(-50%, -50%)";
-  cursorDiv.style.transition = "left 0.05s ease-out";
+  cursorDiv.style.bottom = "0%";
+  //cursorDiv.style.transform = "translate(-50%, -50%)";
+  cursorDiv.style.transition = "left 0.05s ease-out, height 0.3s ease-out";
   cursorDiv.style.height = "80%";
 
   inputParent.appendChild(cursorDiv);
@@ -43,41 +43,56 @@ export const initFormCursor = () => {
   const updateCursorPosition = () => {
     // Wait for selection to be updated
     requestAnimationFrame(() => {
-      // Get current styles
-      const styles = window.getComputedStyle(formInput);
-      const fontSize = styles.fontSize;
-      const fontFamily = styles.fontFamily;
-      const fontWeight = styles.fontWeight;
+      const updatePosition = () => {
+        // Get current styles
+        const styles = window.getComputedStyle(formInput);
+        const fontSize = styles.fontSize;
+        const fontFamily = styles.fontFamily;
+        const fontWeight = styles.fontWeight;
 
-      // Set canvas font to match input
-      ctx.font = `${fontWeight} ${fontSize} ${fontFamily}`;
+        // Set canvas font to match input
+        ctx.font = `${fontWeight} ${fontSize} ${fontFamily}`;
 
-      // Get cursor position (where user clicked or typed)
-      const cursorPos =
-        formInput.selectionStart !== null
-          ? formInput.selectionStart
-          : formInput.value.length;
-      const textBeforeCursor = formInput.value.substring(0, cursorPos);
+        // Get cursor position (where user clicked or typed)
+        const cursorPos =
+          formInput.selectionStart !== null
+            ? formInput.selectionStart
+            : formInput.value.length;
+        const textBeforeCursor = formInput.value.substring(0, cursorPos);
 
-      // Measure text width up to cursor position
-      const textWidth = ctx.measureText(textBeforeCursor).width;
+        // Measure text width up to cursor position
+        const textWidth = ctx.measureText(textBeforeCursor).width;
 
-      // Get input position
-      const inputRect = formInput.getBoundingClientRect();
-      const parentRect = inputParent.getBoundingClientRect();
-      const inputPaddingLeft = parseFloat(styles.paddingLeft) || 0;
+        // Get input position
+        const inputRect = formInput.getBoundingClientRect();
+        const parentRect = inputParent.getBoundingClientRect();
+        const inputPaddingLeft = parseFloat(styles.paddingLeft) || 0;
 
-      // Calculate cursor position
-      const leftOffset =
-        inputRect.left - parentRect.left + inputPaddingLeft + textWidth;
-      cursorDiv.style.left = `${leftOffset}px`;
+        // Calculate cursor position
+        const leftOffset =
+          inputRect.left - parentRect.left + inputPaddingLeft + textWidth;
+        cursorDiv.style.left = `${leftOffset}px`;
 
-      console.log("Cursor:", {
-        cursorPos,
-        text: textBeforeCursor,
-        textWidth,
-        leftOffset,
-      });
+        // Update cursor height based on current font size
+        const fontSizeValue = parseFloat(fontSize);
+        const cursorHeight = fontSizeValue * 1.1;
+        cursorDiv.style.height = `${cursorHeight}px`;
+
+        console.log("Cursor:", {
+          cursorPos,
+          text: textBeforeCursor,
+          textWidth,
+          leftOffset,
+          fontSize,
+          cursorHeight,
+        });
+      };
+
+      // Update immediately for position
+      updatePosition();
+
+      // Update again after font size animation completes (300ms from formTypeSize.js)
+      setTimeout(updatePosition, 320);
     });
   };
 

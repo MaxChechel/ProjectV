@@ -1,7 +1,3 @@
-// Scroll Images Animation Component
-// Handles scroll-based image transitions with text animations
-
-// Browser detection utility
 const detectBrowser = () => {
   const userAgent = navigator.userAgent.toLowerCase();
   const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent);
@@ -11,13 +7,22 @@ const detectBrowser = () => {
   return { isSafari, isIOS, shouldUseMp4: isSafari || isIOS };
 };
 
-// Preload images helper
 const preloadImages = (sources) => {
   return Promise.all(
     sources.map((src) => {
       return new Promise((resolve) => {
         const img = new Image();
-        img.onload = () => resolve(img);
+        img.onload = () => {
+          // Force image decode to warm up GPU
+          if (img.decode) {
+            img
+              .decode()
+              .then(() => resolve(img))
+              .catch(() => resolve(img));
+          } else {
+            resolve(img);
+          }
+        };
         img.onerror = () => {
           console.warn(`Failed to preload image: ${src}`);
           resolve();
@@ -28,10 +33,8 @@ const preloadImages = (sources) => {
   );
 };
 
-// Preload videos helper
 const preloadVideo = (videoElement) => {
   return new Promise((resolve) => {
-    // Resolve when enough data is loaded
     if (videoElement.readyState >= 3) {
       resolve(videoElement);
     } else {
@@ -40,57 +43,51 @@ const preloadVideo = (videoElement) => {
         () => resolve(videoElement),
         { once: true }
       );
-      // Fallback timeout
       setTimeout(() => resolve(videoElement), 5000);
     }
   });
 };
 
 export const initScrollImages = (config = {}) => {
-  // Default configuration
   const defaultConfig = {
     componentSelector: ".scroll_images_component",
     imagesWrapperSelector: ".scroll_images_wrapper .scroll_image",
     imageSelector: ".scroll_image",
     headingsSelector: ".scroll_images_text_item",
     mediaSelector: ".scroll_images_media img, .scroll_images_media video",
-    headingAnimationProgress: [10, 20, 50, 70, 90],
-    staggerTime: 2.5,
+    headingAnimationProgress: [4, 15, 26, 37, 48, 59, 70, 81, 95],
+    staggerTime: 0.8,
     animationDuration: 2,
     initialIncr: 0,
-    initialPreloadCount: 5, // Preload first 5 assets during loader
+    initialPreloadCount: 5,
     scrollSensitivity: {
       wheel: 1000,
-      touch: 500,
+      touch: 200,
     },
     deltaToConfig: {
-      duration: 2.5, // Faster deceleration (was 2.5)
+      duration: 2.5,
       ease: "power2.out",
     },
-    fadeOutStart: 0.95, // Start fading at 95% progress
+    fadeOutStart: 0.98,
   };
 
-  // Merge config with defaults
   const settings = { ...defaultConfig, ...config };
 
-  // Animation state
   let incr = settings.initialIncr;
+  let minIncr = 0; // Minimum scroll position (set after intro animation)
   let zIndex = 0;
   let newIndex = 0;
   const delta = { value: 0 };
-  let isScrollEnabled = false; // Control scroll availability
+  let isScrollEnabled = false;
 
-  // Get DOM elements - scope to specific component
   const scrollImagesComponent = document.querySelector(
     settings.componentSelector
   );
 
   if (!scrollImagesComponent) {
-    console.warn("Scroll images component not found");
     return;
   }
 
-  // Query elements within the component only
   const realImages = scrollImagesComponent.querySelectorAll(
     ".scroll_images_wrapper .scroll_image"
   );
@@ -99,18 +96,25 @@ export const initScrollImages = (config = {}) => {
   );
 
   if (!realImages.length) {
-    console.warn("No scroll images found in component");
     return;
   }
 
-  // Collect ALL media (images and videos) from wrapper
   const medias = [];
+  const initialImages = []; // Track first 5 images that load immediately
 
-  realImages.forEach((element) => {
+  realImages.forEach((element, index) => {
     if (element.tagName === "IMG") {
+      const dataSrc = element.getAttribute("data-src");
       const src = element.getAttribute("src");
-      if (src) {
+
+      // First 10 images with real src (no data-src) - track them
+      if (index < 10 && src && !dataSrc) {
+        initialImages.push(element);
         medias.push({ type: "image", src, element });
+      }
+      // Images with data-src - will be loaded later
+      else if (dataSrc) {
+        medias.push({ type: "image", src: dataSrc, element });
       }
     } else if (element.tagName === "VIDEO") {
       medias.push({ type: "video", element });
@@ -118,21 +122,9 @@ export const initScrollImages = (config = {}) => {
   });
 
   if (!medias.length) {
-    console.warn("No media sources found");
     return;
   }
 
-  console.log(
-    `Found ${medias.length} media items:`,
-    medias.map((m) => m.type)
-  );
-
-  console.log(
-    `Found ${medias.length} media items:`,
-    medias.map((m) => m.type)
-  );
-
-  // Detect browser for video format handling
   const { shouldUseMp4 } = detectBrowser();
 
   // Initialize video sources from data attributes and set correct format
@@ -143,71 +135,95 @@ export const initScrollImages = (config = {}) => {
         const type = source.getAttribute("type");
         const dataSrc = source.getAttribute("data-src");
 
-        // Remove incorrect format immediately
         if (shouldUseMp4 && type === "video/webm") {
           source.remove();
         } else if (!shouldUseMp4 && type === "video/mp4") {
           source.remove();
         } else if (dataSrc) {
-          // Keep the source but don't set src yet (prevents loading)
           source.removeAttribute("src");
         }
       });
     }
   });
 
-  // PHASE 1: Preload first N assets (during loader)
   const preloadInitialAssets = async () => {
-    const initialAssets = medias.slice(0, settings.initialPreloadCount);
-    const imageAssets = initialAssets.filter((m) => m.type === "image");
+    // Wait for the first 10 images (with real src) to load
+    if (initialImages.length > 0) {
+      await Promise.all(
+        initialImages.map((img) => {
+          return new Promise((resolve) => {
+            if (img.complete) {
+              resolve();
+            } else {
+              img.onload = () => resolve();
+              img.onerror = () => resolve(); // Continue even if image fails
+            }
+          });
+        })
+      );
 
-    if (imageAssets.length > 0) {
-      const imageSources = imageAssets.map((m) => m.src);
-      await preloadImages(imageSources);
-      console.log(`✓ Preloaded first ${imageAssets.length} images`);
+      // Force GPU upload by briefly making images visible
+      // Make first 10 images visible with tiny opacity to force GPU upload
+      initialImages.forEach((img) => {
+        img.style.visibility = "visible";
+        img.style.opacity = "0.01"; // Nearly invisible but forces GPU upload
+        img.style.willChange = "transform";
+        // Force a repaint
+        void img.offsetHeight;
+      });
+
+      // Wait for GPU upload
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Reset opacity and hide all except first
+      initialImages.forEach((img, index) => {
+        img.style.opacity = "1";
+        if (index > 0) {
+          img.style.visibility = "hidden";
+        }
+      });
     }
 
-    // IMMEDIATELY start loading remaining assets (don't wait for loader to end)
-    console.log("🚀 Starting to load remaining assets in background...");
-    preloadRemainingAssets();
+    // Start loading remaining assets in background AFTER initial ones are ready
+    setTimeout(() => preloadRemainingAssets(), 100);
 
     return true;
   };
 
-  // PHASE 2: Load remaining assets (starts automatically after Phase 1)
   const preloadRemainingAssets = async () => {
-    const remainingAssets = medias.slice(settings.initialPreloadCount);
+    // Start from index 10 (after the initial images)
+    const remainingAssets = medias.slice(10);
 
-    // Load all remaining images (in parallel, they're smaller)
     const imageAssets = remainingAssets.filter((m) => m.type === "image");
     if (imageAssets.length > 0) {
-      const imageSources = imageAssets.map((m) => m.src);
-      preloadImages(imageSources).then(() => {
-        console.log(`✓ Preloaded ${imageAssets.length} remaining images`);
-      });
+      // Load remaining images in batches of 5
+      const batchSize = 5;
+      for (let i = 0; i < imageAssets.length; i += batchSize) {
+        const batchAssets = imageAssets.slice(i, i + batchSize);
+
+        // Just set src from data-src - browser will load them
+        batchAssets.forEach((asset) => {
+          asset.element.setAttribute("src", asset.src);
+        });
+
+        // Small delay between batches to prevent overwhelming the browser
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
     }
 
-    // Load videos SEQUENTIALLY (one at a time)
     const videoAssets = medias.filter((m) => m.type === "video");
     if (videoAssets.length > 0) {
-      console.log(`📹 Loading ${videoAssets.length} videos sequentially...`);
-
-      // Sequential loading function
       const loadVideoSequentially = async (index) => {
         if (index >= videoAssets.length) {
-          console.log(`✓ All ${videoAssets.length} videos preloaded`);
           return;
         }
 
         const v = videoAssets[index];
-        console.log(`📹 Loading video ${index + 1}/${videoAssets.length}`);
 
-        // Check if data-src is on video element itself
         const videoDataSrc = v.element.getAttribute("data-src");
         if (videoDataSrc) {
           v.element.setAttribute("src", videoDataSrc);
         } else {
-          // Or activate source tags
           const sources = v.element.querySelectorAll("source[data-src]");
           sources.forEach((source) => {
             const dataSrc = source.getAttribute("data-src");
@@ -217,44 +233,40 @@ export const initScrollImages = (config = {}) => {
           });
         }
 
-        // Enable preload and load
         v.element.preload = "auto";
         v.element.load();
 
-        // Wait for this video to load before starting next
         await preloadVideo(v.element);
-        console.log(`✓ Video ${index + 1}/${videoAssets.length} ready`);
-
-        // Load next video
         await loadVideoSequentially(index + 1);
       };
 
-      // Start sequential loading
       loadVideoSequentially(0);
     }
   };
 
-  // Set data-index for all elements and configure videos
   realImages.forEach((element, index) => {
     element.setAttribute("data-index", index);
 
-    // Ensure videos have correct attributes but DON'T load yet
     if (element.tagName === "VIDEO") {
       element.muted = true;
       element.playsInline = true;
       element.loop = true;
-      element.preload = "none"; // Don't load until we're ready
+      element.preload = "none";
+    }
+
+    // Hide all images initially except the first one
+    if (index > 0) {
+      element.style.visibility = "hidden";
+    } else {
+      element.style.visibility = "visible"; // Explicitly set first image visible
     }
   });
 
-  // Play initial video if the first element is a video (and activate sources first)
   if (realImages.length > 0 && realImages[0].tagName === "VIDEO") {
-    // Check if data-src is on video element itself
     const videoDataSrc = realImages[0].getAttribute("data-src");
     if (videoDataSrc) {
       realImages[0].setAttribute("src", videoDataSrc);
     } else {
-      // Or activate source tags
       const sources = realImages[0].querySelectorAll("source[data-src]");
       sources.forEach((source) => {
         const dataSrc = source.getAttribute("data-src");
@@ -266,49 +278,40 @@ export const initScrollImages = (config = {}) => {
 
     realImages[0].preload = "auto";
     realImages[0].load();
-    // Don't set currentTime - let it start naturally or resume
-    realImages[0]
-      .play()
-      .catch((e) => console.warn("Initial video play failed:", e));
+    realImages[0].play().catch(() => {});
   }
 
-  // Set initial state for form wrapper (hidden)
   const formWrapper = document.querySelector(".form_container");
   if (formWrapper) {
     gsap.set(formWrapper, { opacity: 0 });
   }
 
-  // Calculate total animation duration based on number of media items
   const totalDuration =
     (medias.length - 1) * settings.staggerTime + settings.animationDuration;
 
-  // Create timeline
   const tl = gsap.timeline({
     paused: true,
   });
 
-  // Animate all scroll images/videos
   tl.to(realImages, {
-    scale: 1.005,
+    scale: 2.5,
+    z: 0.01,
+    force3D: true,
     ease: "power1.inOut",
     duration: settings.animationDuration,
+    transformOrigin: "center center",
     stagger: {
       each: settings.staggerTime,
       onStart() {
         const el = this.targets()[0];
         const currentIndex = parseInt(el.getAttribute("data-index"));
 
-        // Bring current element to front
         zIndex++;
         el.style.zIndex = zIndex;
-
-        // Videos will resume from where they were paused
-        // No currentTime reset - handled by updateVideoPlayback()
       },
     },
   }).time(incr);
 
-  // Set initial state for all headings
   gsap.set(headings, { opacity: 0, y: 30 });
 
   // Function to update headings based on incr value
@@ -317,58 +320,52 @@ export const initScrollImages = (config = {}) => {
       if (index < settings.headingAnimationProgress.length) {
         const progressValue = settings.headingAnimationProgress[index];
         const triggerTime = (progressValue / 100) * totalDuration;
-        const fadeOutTime = triggerTime + 1.5; // Duration heading stays visible
+        const fadeOutTime = triggerTime + 1.7;
 
-        // Calculate opacity and position based on incr
         if (incr >= triggerTime && incr < fadeOutTime) {
-          // Fade in phase
-          const fadeInProgress = Math.min((incr - triggerTime) / 0.6, 1);
+          const fadeInProgress = Math.min((incr - triggerTime) / 0.4, 1);
+          const opacity = fadeInProgress < 0.05 ? 0 : fadeInProgress; // Hard cutoff for Safari
+          heading.style.visibility = "visible";
           gsap.set(heading, {
-            opacity: fadeInProgress,
+            opacity: opacity,
             y: 30 - fadeInProgress * 30,
           });
-        } else if (incr >= fadeOutTime && incr < fadeOutTime + 0.6) {
-          // Fade out phase
-          const fadeOutProgress = (incr - fadeOutTime) / 0.6;
+        } else if (incr >= fadeOutTime && incr < fadeOutTime + 0.4) {
+          // Faster fade out
+          const fadeOutProgress = (incr - fadeOutTime) / 0.4;
+          const opacity = fadeOutProgress > 0.95 ? 0 : 1 - fadeOutProgress; // Hard cutoff for Safari
+          heading.style.visibility = "visible";
           gsap.set(heading, {
-            opacity: 1 - fadeOutProgress,
+            opacity: opacity,
             y: -30 * fadeOutProgress,
           });
         } else if (incr < triggerTime) {
-          // Before trigger
+          heading.style.visibility = "hidden"; // Force hide for Safari
           gsap.set(heading, { opacity: 0, y: 30 });
         } else {
-          // After fade out
+          heading.style.visibility = "hidden"; // Force hide for Safari
           gsap.set(heading, { opacity: 0, y: -30 });
         }
       }
     });
   };
 
-  // Initial update
   updateHeadingsBasedOnIncr();
 
-  // Function to update video playback based on current timeline position
   const updateVideoPlayback = () => {
     realImages.forEach((el, index) => {
       if (el.tagName === "VIDEO") {
         const startTime = index * settings.staggerTime;
-        // Video should play until the NEXT element finishes scaling up
-        // That means: current start + stagger (to reach next) + animationDuration (next scales)
         const endTime =
           startTime + settings.staggerTime + settings.animationDuration;
 
         const shouldBeActive = incr >= startTime && incr < endTime;
 
         if (shouldBeActive) {
-          // Video should be playing - check every frame
           if (el.paused) {
-            el.play().catch((e) => {
-              // Silently fail and retry on next frame if needed
-            });
+            el.play().catch(() => {});
           }
         } else {
-          // Video should be paused
           if (!el.paused) {
             el.pause();
           }
@@ -377,25 +374,46 @@ export const initScrollImages = (config = {}) => {
     });
   };
 
-  // Setup delta animation
+  // Optimize performance by hiding images that are far from current view
+  const optimizeVisibility = () => {
+    const currentImageIndex = Math.floor(incr / settings.staggerTime);
+    const visibleBefore = 4; //
+    const visibleAfter = 1; // Keep 1 image after current
+
+    realImages.forEach((el, index) => {
+      const relativePosition = index - currentImageIndex;
+
+      // Hide if outside the visible range
+      if (
+        relativePosition < -visibleBefore ||
+        relativePosition > visibleAfter
+      ) {
+        // Hide and reduce GPU load for distant images
+        el.style.visibility = "hidden";
+        el.style.willChange = "auto";
+      } else {
+        el.style.visibility = "visible";
+        el.style.willChange = "transform";
+      }
+    });
+  };
+
   const deltaTo = gsap.quickTo(delta, "value", {
     duration: settings.deltaToConfig.duration,
     ease: settings.deltaToConfig.ease,
     onUpdate: () => {
       incr += delta.value;
-
-      // Clamp incr to stay within timeline bounds
-      incr = Math.max(0, Math.min(incr, totalDuration));
+      incr = Math.max(minIncr, Math.min(incr, totalDuration));
 
       tl.time(incr);
-
-      // Animate headings based on incr value
       updateHeadingsBasedOnIncr();
-
-      // Update video playback based on timeline position
       updateVideoPlayback();
 
-      // Fade out component when animation reaches the end
+      // Only optimize visibility when scroll is enabled (not during intro animation)
+      if (isScrollEnabled) {
+        optimizeVisibility();
+      }
+
       const progress = incr / totalDuration;
       if (progress >= settings.fadeOutStart) {
         const fadeProgress =
@@ -407,33 +425,33 @@ export const initScrollImages = (config = {}) => {
         gsap.set(scrollImagesComponent, { opacity: 1 });
       }
 
-      // Show form_wrapper when animation is complete
-      //const formWrapper = document.querySelector(".form_wrapper");
       if (formWrapper) {
         if (progress >= 1) {
-          // Animation complete - show form
-          gsap.to(formWrapper, { opacity: 1, pointerEvents: "auto" });
+          gsap.to(formWrapper, {
+            opacity: 1,
+            pointerEvents: "auto",
+            duration: 0.3,
+          });
         } else {
-          // Animation not complete - hide form
           gsap.to(formWrapper, { opacity: 0, pointerEvents: "none" });
         }
       }
     },
   });
 
-  // Create scroll observer
   const scrollObserver = Observer.create({
     target: window,
     type: "wheel,touch",
     onChange: (e) => {
-      // Ignore scroll events if scroll is disabled
       if (!isScrollEnabled) return;
 
-      const divider =
-        e.event.type === "touchmove"
-          ? settings.scrollSensitivity.touch
-          : settings.scrollSensitivity.wheel;
-      deltaTo(e.deltaY / divider);
+      const isTouchEvent = e.event.type === "touchmove";
+      const divider = isTouchEvent
+        ? settings.scrollSensitivity.touch
+        : settings.scrollSensitivity.wheel;
+
+      const delta = isTouchEvent ? -e.deltaY : e.deltaY;
+      deltaTo(delta / divider);
     },
     onStop: () => {
       if (!isScrollEnabled) return;
@@ -441,10 +459,9 @@ export const initScrollImages = (config = {}) => {
     },
   });
 
-  // Return API for external control if needed
   return {
-    preloadInitialAssets, // Call during loader
-    preloadRemainingAssets, // Call after loader finishes
+    preloadInitialAssets,
+    preloadRemainingAssets,
     getProgress: () => incr / totalDuration,
     getTotalDuration: () => totalDuration,
     getCurrentTime: () => incr,
@@ -454,9 +471,21 @@ export const initScrollImages = (config = {}) => {
     disableScroll: () => {
       isScrollEnabled = false;
     },
-    // Animate to specific progress (0-1)
-    animateToProgress: (targetProgress, duration = 2) => {
+    animateToProgress: (
+      targetProgress,
+      duration = 2,
+      minimumProgress = null
+    ) => {
       const targetTime = targetProgress * totalDuration;
+
+      // Make sure enough images are visible for intro animation
+      const targetImageIndex = Math.ceil(targetTime / settings.staggerTime);
+      realImages.forEach((el, index) => {
+        if (index <= targetImageIndex + 1) {
+          el.style.visibility = "visible";
+        }
+      });
+
       return gsap.to(
         { value: incr },
         {
@@ -467,6 +496,12 @@ export const initScrollImages = (config = {}) => {
             incr = this.targets()[0].value;
             tl.time(incr);
             updateHeadingsBasedOnIncr();
+          },
+          onComplete: function () {
+            // Set minimum scroll position after intro animation
+            if (minimumProgress !== null) {
+              minIncr = minimumProgress * totalDuration;
+            }
           },
         }
       );
