@@ -40,4 +40,15 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
 
   initForm();
+
+  // Handle "Request Your Invite" link click
+  const requestInviteLink = document.querySelector('a[href*="invite"]');
+  if (requestInviteLink) {
+    requestInviteLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (window.scrollImagesAnimation) {
+        window.scrollImagesAnimation.jumpToForm();
+      }
+    });
+  }
 });

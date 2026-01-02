@@ -1,130 +1,114 @@
 export const initLoader = (assetsReadyPromise) => {
   const loaderWrapper = document.querySelector(".loader_wrapper");
   const numsWrapper = document.querySelector(".loader_nums_wrap");
-  const numsTrack1 = document.querySelector(".loader_num_track.is-1");
-  const numsTrack2 = document.querySelector(".loader_num_track.is-2");
-
-  const track2Zero = numsTrack2.querySelector(".loader_num:first-child");
-  const track1Numbers = numsTrack1.querySelectorAll(
-    ".loader_num:not(:first-child)"
-  );
-  const track2Numbers = numsTrack2.querySelectorAll(
-    ".loader_num:not(:first-child)"
-  );
+  const loaderNumber = document.querySelector(".loader_num"); // Single number element
 
   return new Promise(async (resolve) => {
     const loaderTl = gsap.timeline({
       delay: 0.5,
     });
 
+    // Step 1: Animate to 23
     const loaderStep1 = gsap.timeline();
-
     loaderStep1
-      .to(numsWrapper, {
-        x: loaderWrapper.scrollWidth / 5,
-        duration: 0.7,
-        ease: "circ.out",
+      .to(loaderNumber, {
+        opacity: 0,
+        duration: 0.5,
+        ease: "power2.inOut",
+        onComplete: () => {
+          loaderNumber.textContent = "23";
+          // Move wrapper instantly while number is invisible
+          gsap.set(numsWrapper, { x: loaderWrapper.scrollWidth / 8 });
+        },
       })
       .to(
-        numsTrack1,
+        loaderNumber,
         {
-          width: "auto",
-        },
-        0
-      )
-      .to(
-        [track1Numbers[0], track2Numbers[0]],
-        {
-          y: "0%",
           opacity: 1,
-          filter: "blur(0px)",
-          duration: 0.75,
-          ease: "circ.out",
-          stagger: 0.1,
+          duration: 0.6,
+          ease: "power2.inOut",
         },
-        "<25%"
-      )
-      .to(
-        track2Zero,
-        {
-          y: "-100%",
-          opacity: 0,
-          filter: "blur(4px)",
-          duration: 0.5,
-          ease: "circ.out",
-        },
-        "<0%"
+        ">"
       );
 
+    // Step 2: Animate to 59
     const loaderStep2 = gsap.timeline();
-
     loaderStep2
-      .to(numsWrapper, {
-        x: loaderWrapper.scrollWidth / 1.75,
-        duration: 1.4,
-        ease: "circ.out",
+      .to(loaderNumber, {
+        opacity: 0,
+        duration: 0.5,
+        ease: "power2.inOut",
+        onComplete: () => {
+          loaderNumber.textContent = "59";
+          // Move wrapper instantly while number is invisible
+          gsap.set(numsWrapper, { x: loaderWrapper.scrollWidth / 3 });
+        },
       })
       .to(
-        [track1Numbers[0], track2Numbers[0]],
+        loaderNumber,
         {
-          y: "-100%",
-          opacity: 0,
-          filter: "blur(4px)",
-          duration: 0.5,
-          ease: "circ.out",
-          stagger: 0.1,
-        },
-        "<0%"
-      )
-      .to(
-        [track1Numbers[1], track2Numbers[1]],
-        {
-          y: "0%",
           opacity: 1,
-          filter: "blur(0px)",
-          duration: 0.75,
-          ease: "circ.out",
-          stagger: 0.1,
+          duration: 0.6,
+          ease: "power2.inOut",
         },
-        "<0%"
+        ">"
       );
 
+    // Step 3: Animate to 83
     const loaderStep3 = gsap.timeline();
-
     loaderStep3
-      .to(numsWrapper, {
-        x: () => loaderWrapper.scrollWidth - numsWrapper.scrollWidth,
-        duration: 0.8,
-        ease: "circ.out",
+      .to(loaderNumber, {
+        opacity: 0,
+        duration: 0.5,
+        ease: "power2.inOut",
+        onComplete: () => {
+          loaderNumber.textContent = "83";
+          // Move wrapper instantly while number is invisible
+          gsap.set(numsWrapper, { x: loaderWrapper.scrollWidth / 2 });
+        },
       })
       .to(
-        [track1Numbers[1], track2Numbers[1]],
+        loaderNumber,
         {
-          y: "-100%",
-          opacity: 0,
-          filter: "blur(4px)",
-          duration: 0.5,
-          ease: "circ.out",
-          stagger: 0.1,
-        },
-        "<0%"
-      )
-      .to(
-        [track1Numbers[2], track2Numbers[2]],
-        {
-          y: "0%",
           opacity: 1,
-          filter: "blur(0px)",
-          duration: 0.75,
-          ease: "circ.out",
-          stagger: 0.1,
+          duration: 0.6,
+          ease: "power2.inOut",
         },
-        "<25%"
+        ">"
       );
 
-    loaderTl.add(loaderStep1).add(loaderStep2, ">.5").add(loaderStep3, ">.5");
+    // Step 4: Animate to 97
+    const loaderStep4 = gsap.timeline();
+    loaderStep4
+      .to(loaderNumber, {
+        opacity: 0,
+        duration: 0.5,
+        ease: "power2.inOut",
+        onComplete: () => {
+          loaderNumber.textContent = "97";
+          // Move wrapper instantly while number is invisible
+          gsap.set(numsWrapper, {
+            x: loaderWrapper.scrollWidth - numsWrapper.scrollWidth,
+          });
+        },
+      })
+      .to(
+        loaderNumber,
+        {
+          opacity: 1,
+          duration: 0.6,
+          ease: "power2.inOut",
+        },
+        ">"
+      );
 
-    // Wait for loader animation to reach 99%, then wait for assets
+    loaderTl
+      .add(loaderStep1)
+      .add(loaderStep2, ">.3")
+      .add(loaderStep3, ">.3")
+      .add(loaderStep4, ">.3");
+
+    // Wait for loader animation to reach 97%, then wait for assets
     await loaderTl.then();
 
     // Now wait for assets to be ready before fading out

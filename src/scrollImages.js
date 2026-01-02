@@ -506,6 +506,33 @@ export const initScrollImages = (config = {}) => {
         }
       );
     },
+    jumpToForm: (duration = 0.6) => {
+      return new Promise((resolve) => {
+        // Set progress to 100% instantly (no animation of images)
+        incr = totalDuration;
+        tl.time(incr);
+        updateHeadingsBasedOnIncr();
+
+        // Fade out scroll images component
+        gsap.to(scrollImagesComponent, {
+          opacity: 0,
+          duration: duration,
+          ease: "power2.inOut",
+          onComplete: () => {
+            // Show form
+            if (formWrapper) {
+              gsap.to(formWrapper, {
+                opacity: 1,
+                pointerEvents: "auto",
+                duration: duration,
+                ease: "power2.inOut",
+              });
+            }
+            resolve();
+          },
+        });
+      });
+    },
     destroy: () => {
       tl.kill();
       if (scrollObserver) {
